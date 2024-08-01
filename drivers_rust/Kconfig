@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-2.0-only
+menuconfig DRIVERS_RUST
+	bool "Drivers built in rust"
+
+if DRIVERS_RUST
+endif # DRIVERS_RUST
