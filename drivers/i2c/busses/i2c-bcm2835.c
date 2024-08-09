@@ -523,6 +523,8 @@ static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
 
 static int bcm2835_i2c_probe(struct platform_device *pdev)
 {
+	pr_info("i2c probe!");
+	
 	struct bcm2835_i2c_dev *i2c_dev;
 	int ret;
 	struct i2c_adapter *adap;
