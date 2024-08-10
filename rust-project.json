@@ -52002,6 +52002,6 @@
             "root_module": "/home/rust/r4l_driver/linux_raspberrypi/drivers/i2c/busses/i2c_bcm2835_rust.rs"
         }
     ],
-    "sysroot_src": "/root/.rustup/toolchains/1.73.0-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library",
-    "sysroot": "/root/.rustup/toolchains/1.73.0-x86_64-unknown-linux-gnu"
+    "sysroot_src": "/root/.rustup/toolchains/1.73.0-aarch64-unknown-linux-gnu/lib/rustlib/src/rust/library",
+    "sysroot": "/root/.rustup/toolchains/1.73.0-aarch64-unknown-linux-gnu"
 }
