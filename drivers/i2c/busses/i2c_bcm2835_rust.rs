@@ -16,7 +16,9 @@ module_platform_driver! {
     initcall: "arch",
 }
 
-struct I2cBcm2835Data {}
+struct I2cBcm2835Data {
+    
+}
 
 impl driver::DeviceRemoval for I2cBcm2835Data {
     fn device_remove(&self){
