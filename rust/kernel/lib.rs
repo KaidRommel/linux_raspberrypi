@@ -74,6 +74,7 @@ pub mod completion;
 pub mod timekeeping;
 pub mod irq;
 pub mod clk;
+pub mod clk_provider;
 pub mod serial;
 
 #[doc(hidden)]
