@@ -192,12 +192,34 @@ struct I2cBcm2835Data {
     // completion: completion::Completion,
 }
 
-unsafe fn of_property_read_u32(device: &device::Device, propname: &'static CStr, val: *mut u32) -> Result {
+fn of_property_read_u32(device: &device::Device, propname: &'static CStr, val: *mut u32) -> Result {
     to_result(unsafe {
         let np = (*device.raw_device()).of_node;
         bindings::of_property_read_variable_u32_array(np, propname.as_char_ptr(), val, 1, 0)
     })
 }
+
+fn clk_set_rate_exclusive(bus_clk: &Clk, bus_clk_rate: u32) -> Result {
+    to_result(unsafe{
+        bindings::clk_set_rate_exclusive(bus_clk.as_ptr(), bus_clk_rate.into())
+    })
+}
+
+fn clk_prepare_enable(bus_clk: &Clk) -> Result {
+    unsafe {
+        let mut ret = bindings::clk_prepare(bus_clk.as_ptr());
+        if ret == 0{
+            return Ok(());
+        }
+        ret = bindings::clk_enable(bus_clk.as_ptr());
+        if ret == 0 {
+            bindings::clk_unprepare(bus_clk.as_ptr())
+        }
+        to_result(ret)
+    }
+}
+
+
 
 impl I2cBcm2835Data {
     // Create I2cBcm2835Data from raw ptr
@@ -284,14 +306,9 @@ impl platform::Driver for I2cBcm2835 {
     driver_of_id_table!(MY_ID_TABLE);
 
     fn probe(dev: &mut platform::Device, _id_info: Option<&Self::IdInfo>) -> Result<Self::Data> {
-        pr_info!("i2c device probe!");
         dev_info!(dev,"BCM2835 i2c bus device ({}) driver probe.\n",dev.name());
 
         let device= device::Device::from_dev(dev);
-
-        //let device_data_ptr = unsafe{ i2c_kzalloc::<I2cBcm2835Data>(&device)?};
-
-        
 
         let reg_base = dev.ioremap_resource(0)?;
         pr_info!("reg base: {:?}", reg_base);
@@ -301,19 +318,34 @@ impl platform::Driver for I2cBcm2835 {
 
         let mut bus_clk_rate: u32 = 0;
         // CHECK
-        unsafe {
-            if let Err(_) = of_property_read_u32(&device, c_str!("clock-frequency"), &mut bus_clk_rate) {
-                bus_clk_rate = bindings::I2C_MAX_STANDARD_MODE_FREQ;
-                dev_err!(dev,"Could not read clock-frequency property\n",);
-            }
-        };
+
+        if let Err(_) = of_property_read_u32(&device, c_str!("clock-frequency"), &mut bus_clk_rate) {
+            bus_clk_rate = bindings::I2C_MAX_STANDARD_MODE_FREQ;
+            dev_err!(dev,"Could not read clock-frequency property\n",);
+        }
+
+
+        if let Err(_) = clk_set_rate_exclusive(bus_clk, bus_clk_rate) {
+            dev_err!(dev,"Could not set clock frequency\n",);
+        }
+
+
+        if let Err(_) = clk_prepare_enable(bus_clk) {
+            dev_err!(dev,"Couldn't prepare clock\n",);
+        }
+
+
+        if let Err(_) = dev.irq_resource(0) {
+            dev_err!(dev,"Couldn't get IRQ resource\n",);
+        }
+
 
         let device_data = Arc::try_new(I2cBcm2835Data{
             dev: device,
             reg_base: reg_base,
         })?;
 
-        pr_info!("i2c device probe END!");
+        dev_info!(dev,"BCM2835 i2c bus device ({}) driver probe END.\n",dev.name());
         Ok(device_data)
     }
     fn remove(_data: &Self::Data) -> Result {

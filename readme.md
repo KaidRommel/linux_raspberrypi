@@ -41,6 +41,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		return dev_err_probe(&pdev->dev, PTR_ERR(i2c_dev->bus_clk),
 				     "Could not register clock\n");
 
+	// 从设备树中读取时钟频率，封装 of_property_read 实现
 	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
 				   &bus_clk_rate);
 	if (ret < 0) {
@@ -49,11 +50,13 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		bus_clk_rate = I2C_MAX_STANDARD_MODE_FREQ;
 	}
 
+	// 检查时钟频率设置是否成功，封装 clk_set_rate_exclusive 实现
 	ret = clk_set_rate_exclusive(i2c_dev->bus_clk, bus_clk_rate);
 	if (ret < 0)
 		return dev_err_probe(&pdev->dev, ret,
 				     "Could not set clock frequency\n");
 
+	// 准备并使能时钟，封装 clk_prepare_enable 实现
 	ret = clk_prepare_enable(i2c_dev->bus_clk);
 	if (ret) {
 		dev_err(&pdev->dev, "Couldn't prepare clock");
