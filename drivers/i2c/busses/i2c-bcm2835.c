@@ -195,6 +195,8 @@ static int clk_bcm2835_i2c_calc_divider(unsigned long rate,
 static int clk_bcm2835_i2c_set_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long parent_rate)
 {
+	pr_info("c driver:i2c set rate!");
+
 	struct clk_bcm2835_i2c *div = to_clk_bcm2835_i2c(hw);
 	u32 redl, fedl;
 	u32 clk_tout;
@@ -238,6 +240,8 @@ static int clk_bcm2835_i2c_set_rate(struct clk_hw *hw, unsigned long rate,
 static long clk_bcm2835_i2c_round_rate(struct clk_hw *hw, unsigned long rate,
 				unsigned long *parent_rate)
 {
+	pr_info("c driver:i2c round rate!");
+
 	u32 divider = clk_bcm2835_i2c_calc_divider(rate, *parent_rate);
 
 	return DIV_ROUND_UP(*parent_rate, divider);
@@ -246,6 +250,8 @@ static long clk_bcm2835_i2c_round_rate(struct clk_hw *hw, unsigned long rate,
 static unsigned long clk_bcm2835_i2c_recalc_rate(struct clk_hw *hw,
 						unsigned long parent_rate)
 {
+	pr_info("c driver:i2c recalc rate!");
+	
 	struct clk_bcm2835_i2c *div = to_clk_bcm2835_i2c(hw);
 	u32 divider = bcm2835_i2c_readl(div->i2c_dev, BCM2835_I2C_DIV);
 
@@ -262,6 +268,7 @@ static struct clk *bcm2835_i2c_register_div(struct device *dev,
 					struct clk *mclk,
 					struct bcm2835_i2c_dev *i2c_dev)
 {
+	pr_info("c driver:i2c register div!");
 	struct clk_init_data init;
 	struct clk_bcm2835_i2c *priv;
 	char name[32];
@@ -285,6 +292,7 @@ static struct clk *bcm2835_i2c_register_div(struct device *dev,
 	priv->i2c_dev = i2c_dev;
 
 	clk_hw_register_clkdev(&priv->hw, "div", dev_name(dev));
+	
 	return devm_clk_register(dev, &priv->hw);
 }
 
@@ -523,7 +531,7 @@ static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
 
 static int bcm2835_i2c_probe(struct platform_device *pdev)
 {
-	pr_info("i2c probe!");
+	pr_info("c driver:i2c probe!");
 	
 	struct bcm2835_i2c_dev *i2c_dev;
 	int ret;
@@ -548,13 +556,16 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 				     "Could not get clock\n");
 
 	i2c_dev->bus_clk = bcm2835_i2c_register_div(&pdev->dev, mclk, i2c_dev);
+	pr_info("c driver:i2c register div end!");
 
 	if (IS_ERR(i2c_dev->bus_clk))
 		return dev_err_probe(&pdev->dev, PTR_ERR(i2c_dev->bus_clk),
 				     "Could not register clock\n");
 
+	pr_info("c driver:i2c of property read!");
 	ret = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
 				   &bus_clk_rate);
+	pr_info("c driver:i2c of property read end!");
 	if (ret < 0) {
 		dev_warn(&pdev->dev,
 			 "Could not read clock-frequency property\n");

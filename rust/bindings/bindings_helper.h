@@ -30,8 +30,11 @@
 #include <linux/amba/bus.h>
 #include <linux/serial_core.h>
 #include <linux/clk.h>
+
 #include <linux/clk-provider.h>
 #include <linux/clkdev.h>
+#include <linux/io.h>
+#include <linux/i2c.h>
 
 /* `bindgen` gets confused at certain things. */
 const size_t BINDINGS_ARCH_SLAB_MINALIGN = ARCH_SLAB_MINALIGN;
