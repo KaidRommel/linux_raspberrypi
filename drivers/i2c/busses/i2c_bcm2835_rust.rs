@@ -19,6 +19,7 @@ use kernel::clk_provider::{self, ClkInitData};
 use kernel::str::{CStr, CString};
 use kernel::c_str;
 use kernel::container_of;
+use kernel::irq;
 
 module_platform_driver! {
     type: I2cBcm2835,
@@ -170,7 +171,23 @@ impl ClkBcm2835I2c {
 
 }
 
-struct I2cBcm2835Adapter {}
+mod i2c_adapter {
+    use kernel::bindings;
+    use kernel::types::Opaque;
+
+    struct I2cAdapter (Opaque<bindings::i2c_adapter>);
+
+    impl I2cAdapter {
+        fn i2c_get_apadata(&self) {
+
+        }
+
+        
+
+    }
+
+}
+
 
 // CHECK
 unsafe fn i2c_kzalloc<T>(device: &device::Device) -> Result<*mut T>{
@@ -242,7 +259,7 @@ impl I2cBcm2835Data {
     // 读取分频器寄存器的值
     pub(crate) fn bcm2835_i2c_readl(&self, reg: usize) -> u32 {
         let addr = self.reg_base.wrapping_add(reg);
-        unsafe { bindings::readl(addr as _)}
+        unsafe { bindings::readl(addr as _) }
     }
 
     pub(crate) fn bcm2835_i2c_register_div<'a>(dev: &'a device::Device, mclk: &'a Clk, reg_base: *mut u8) -> Result<&'a mut Clk> {
@@ -324,12 +341,10 @@ impl platform::Driver for I2cBcm2835 {
             dev_err!(dev,"Could not read clock-frequency property\n",);
         }
 
-
         if let Err(_) = clk_set_rate_exclusive(bus_clk, bus_clk_rate) {
             dev_err!(dev,"Could not set clock frequency\n",);
         }
-
-
+        
         if let Err(_) = clk_prepare_enable(bus_clk) {
             dev_err!(dev,"Couldn't prepare clock\n",);
         }
@@ -338,7 +353,6 @@ impl platform::Driver for I2cBcm2835 {
         if let Err(_) = dev.irq_resource(0) {
             dev_err!(dev,"Couldn't get IRQ resource\n",);
         }
-
 
         let device_data = Arc::try_new(I2cBcm2835Data{
             dev: device,
