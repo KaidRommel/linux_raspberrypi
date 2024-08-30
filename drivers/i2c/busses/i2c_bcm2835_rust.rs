@@ -3,7 +3,7 @@
 //! Rust i2c driver.
 use core::cmp::max;
 use core::f32::consts;
-use core::result;
+use core::{ffi, result};
 use core::result::Result::Ok;
 
 use kernel::device::RawDevice;
@@ -171,23 +171,35 @@ impl ClkBcm2835I2c {
 
 }
 
-mod i2c_adapter {
+mod i2c_func {
     use kernel::bindings;
     use kernel::types::Opaque;
 
-    struct I2cAdapter (Opaque<bindings::i2c_adapter>);
+    struct I2cMsg {
+        ptr: *mut bindings::i2c_msg,
+    }
+
+    
+    
+    pub struct I2cAdapter<T:I2cAlgo> {
+        adapter: Opaque<bindings::i2c_adapter>,
+        _phantom: PhantomData<T>,
+    }
 
     impl I2cAdapter {
         fn i2c_get_apadata(&self) {
 
         }
-
-        
-
     }
 
 }
 
+struct I2cBcm2835Algo;
+
+#[vtable]
+impl I2cBcm2835Algo {
+
+}
 
 // CHECK
 unsafe fn i2c_kzalloc<T>(device: &device::Device) -> Result<*mut T>{
@@ -201,13 +213,20 @@ unsafe fn i2c_kzalloc<T>(device: &device::Device) -> Result<*mut T>{
     Ok(ptr as *mut T)
 }
 
-struct I2cBcm2835Data {
-    dev: device::Device,
-    reg_base: *mut u8,
-    // irq: i32,
-    // i2c_adapter: I2cBcm2835Adapter,
-    // completion: completion::Completion,
+struct I2cBcm2835IrqHandler;
+
+impl irq::Handler for I2cBcm2835IrqHandler {
+    type Data = Arc<I2cBcm2835Data>;
+
+    fn handle_irq(data: ArcBorrow<'_, DwI2cData>) -> irq::Return {
+        
+        irq::Return::None
+    }
 }
+
+
+
+
 
 fn of_property_read_u32(device: &device::Device, propname: &'static CStr, val: *mut u32) -> Result {
     to_result(unsafe {
@@ -236,10 +255,25 @@ fn clk_prepare_enable(bus_clk: &Clk) -> Result {
     }
 }
 
-
+// fn request_irq(irq: i32, )
+struct I2cBcm2835Data {
+    dev: device::Device,
+    reg_base: *mut u8,
+    irq: irq::Registration::<I2cBcm2835IrqHandler>,
+    // i2c_adapter: I2cBcm2835Adapter,
+    // completion: completion::Completion,
+}
 
 impl I2cBcm2835Data {
     // Create I2cBcm2835Data from raw ptr
+    pub(crate) fn new(
+        dev: device::Device, 
+        reg_base: *mut u8, 
+        irq: u32
+    ) -> Arc<Self> {
+
+    }
+    
     unsafe fn from_raw<'a>(ptr: *mut Self) -> &'a mut Self {
         let ptr = ptr.cast::<Self>();
         unsafe {&mut *ptr}  
@@ -289,6 +323,10 @@ impl I2cBcm2835Data {
             from_err_ptr(bindings::devm_clk_register(dev.raw_device(), clk_bcm2835_i2c.clk_hw.as_mut_ptr()))?
         }; 
         Ok(Clk::from_raw(raw_ptr))
+    }
+
+    pub(crate) fn request_irq(irq: u32, data: Box<u32>) -> Result<irq::Registration<Example>> {
+        irq::Registration::try_new(irq, data, irq::flags::SHARED, fmt!("example_{irq}"))
     }
 }
 
@@ -350,9 +388,7 @@ impl platform::Driver for I2cBcm2835 {
         }
 
 
-        if let Err(_) = dev.irq_resource(0) {
-            dev_err!(dev,"Couldn't get IRQ resource\n",);
-        }
+        let irq = dev.irq_resource(0)?;
 
         let device_data = Arc::try_new(I2cBcm2835Data{
             dev: device,

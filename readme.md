@@ -63,6 +63,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
 		goto err_put_exclusive_rate;
 	}
 
+	// 
 	i2c_dev->irq = platform_get_irq(pdev, 0);
 	if (i2c_dev->irq < 0) {
 		ret = i2c_dev->irq;
@@ -110,4 +111,121 @@ err_put_exclusive_rate:
 
 	return ret;
 }
+```
+
+## 中断回调函数
+```c
+static irqreturn_t bcm2835_i2c_isr(int this_irq, void *data)
+{
+    struct bcm2835_i2c_dev *i2c_dev = data;
+    u32 val, err;
+
+    // 读取 I2C 状态寄存器的值
+    val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
+    bcm2835_debug_add(i2c_dev, val);
+
+    // 检查错误标志和时钟状态
+    err = val & (BCM2835_I2C_S_CLKT | BCM2835_I2C_S_ERR);
+    if (err && !(val & BCM2835_I2C_S_TA))
+        i2c_dev->msg_err = err;
+
+    // 处理完成标志
+    if (val & BCM2835_I2C_S_DONE) {
+        if (!i2c_dev->curr_msg) {
+            dev_err(i2c_dev->dev, "Got unexpected interrupt (from firmware?)\n");
+        } else if (i2c_dev->curr_msg->flags & I2C_M_RD) {
+            bcm2835_drain_rxfifo(i2c_dev);
+            val = bcm2835_i2c_readl(i2c_dev, BCM2835_I2C_S);
+        }
+
+        // 检查接收数据标志或剩余的消息缓冲区
+        if ((val & BCM2835_I2C_S_RXD) || i2c_dev->msg_buf_remaining)
+            i2c_dev->msg_err = BCM2835_I2C_S_LEN;
+        goto complete;
+    }
+
+    // 处理发送数据寄存器的写入标志
+    if (val & BCM2835_I2C_S_TXW) {
+        if (!i2c_dev->msg_buf_remaining) {
+            i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
+            goto complete;
+        }
+
+        bcm2835_fill_txfifo(i2c_dev);
+
+        if (i2c_dev->num_msgs && !i2c_dev->msg_buf_remaining) {
+            i2c_dev->curr_msg++;
+            bcm2835_i2c_start_transfer(i2c_dev);
+        }
+
+        return IRQ_HANDLED;
+    }
+
+    // 处理接收数据寄存器的读取标志
+    if (val & BCM2835_I2C_S_RXR) {
+        if (!i2c_dev->msg_buf_remaining) {
+            i2c_dev->msg_err = val | BCM2835_I2C_S_LEN;
+            goto complete;
+        }
+
+        bcm2835_drain_rxfifo(i2c_dev);
+        return IRQ_HANDLED;
+    }
+
+    // 没有处理到的中断情况
+    return IRQ_NONE;
+
+complete:
+    // 清理 I2C 控制和状态寄存器
+    bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, BCM2835_I2C_C_CLEAR);
+    bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_S, BCM2835_I2C_S_CLKT |
+               BCM2835_I2C_S_ERR | BCM2835_I2C_S_DONE);
+    complete(&i2c_dev->completion);
+
+    return IRQ_HANDLED;
+}
+```
+# Algo 结构体
+
+```c
+static const struct i2c_algorithm bcm2835_i2c_algo = {
+	.master_xfer	= bcm2835_i2c_xfer,
+	.functionality	= bcm2835_i2c_func,
+};
+```
+
+# Adap 结构体
+
+```c
+struct i2c_adapter {
+	struct module *owner;
+	unsigned int class;		  /* classes to allow probing for */
+	const struct i2c_algorithm *algo; /* the algorithm to access the bus */
+	void *algo_data;
+
+	/* data fields that are valid for all devices	*/
+	const struct i2c_lock_operations *lock_ops;
+	struct rt_mutex bus_lock;
+	struct rt_mutex mux_lock;
+
+	int timeout;			/* in jiffies */
+	int retries;
+	struct device dev;		/* the adapter device */
+	unsigned long locked_flags;	/* owned by the I2C core */
+#define I2C_ALF_IS_SUSPENDED		0
+#define I2C_ALF_SUSPEND_REPORTED	1
+
+	int nr;
+	char name[48];
+	struct completion dev_released;
+
+	struct mutex userspace_clients_lock;
+	struct list_head userspace_clients;
+
+	struct i2c_bus_recovery_info *bus_recovery_info;
+	const struct i2c_adapter_quirks *quirks;
+
+	struct irq_domain *host_notify_domain;
+	struct regulator *bus_regulator;
+};
 ```

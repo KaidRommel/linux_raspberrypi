@@ -10,7 +10,7 @@ use crate::{
     bindings,
     device::{self, RawDevice},
     driver,
-    error::{from_result, to_result, from_err_ptr, Result},
+    error::{self, from_err_ptr, from_result, to_result, Result},
     of,
     str::CStr,
     types::ForeignOwnable,
@@ -184,9 +184,14 @@ impl Device {
     }
 
     /// Returns irq of the platform device.
-    pub fn irq_resource(&self, index: u32) -> Result {
+    pub fn irq_resource(&self, index: u32) -> Result<i32> {
         // SAFETY: By the type invariants, we know that `self.ptr` is non-null and valid.
-        to_result(unsafe {bindings::platform_get_irq(self.ptr, index)})
+        let ret = unsafe { bindings::platform_get_irq(self.ptr, index) };
+        if ret < 0 {
+            Err(error::Error::from_errno(ret))
+        } else {
+            Ok(ret)
+        }
     }
 
     /// Return ioremap ptr
