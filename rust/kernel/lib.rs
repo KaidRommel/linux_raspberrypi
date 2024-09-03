@@ -23,6 +23,7 @@
 #![feature(unsize)]
 #![feature(const_mut_refs)]
 #![feature(const_maybe_uninit_zeroed)]
+#![feature(ptr_metadata)]
 
 // Ensure conditional compilation based on the kernel configuration works;
 // otherwise we may silently break things like initcall handling.
@@ -76,6 +77,8 @@ pub mod irq;
 pub mod clk;
 pub mod clk_provider;
 pub mod serial;
+pub mod i2c;
+pub mod regmap;
 
 #[doc(hidden)]
 pub use bindings;

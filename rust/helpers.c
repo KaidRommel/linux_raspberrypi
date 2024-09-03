@@ -37,6 +37,7 @@
 #include <linux/highmem.h>
 #include <linux/uaccess.h>
 #include <linux/amba/bus.h>
+#include <linux/regmap.h>
 
 __noreturn void rust_helper_BUG(void)
 {
@@ -423,3 +424,23 @@ static_assert(
 	__alignof__(size_t) == __alignof__(uintptr_t),
 	"Rust code expects C `size_t` to match Rust `usize`"
 );
+
+#if IS_BUILTIN(CONFIG_REGMAP)
+struct regmap *rust_helper_regmap_init(struct device *dev,
+					   const struct regmap_bus *bus,
+					   void *bus_context,
+					   const struct regmap_config *config)
+{
+	return regmap_init(dev, bus, bus_context, config);
+}
+EXPORT_SYMBOL_GPL(rust_helper_regmap_init);
+
+struct regmap *rust_helper_devm_regmap_init(struct device *dev,
+					   const struct regmap_bus *bus,
+					   void *bus_context,
+					   const struct regmap_config *config)
+{
+	return devm_regmap_init(dev, bus, bus_context, config);
+}
+EXPORT_SYMBOL_GPL(rust_helper_devm_regmap_init);
+#endif

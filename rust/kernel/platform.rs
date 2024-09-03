@@ -205,6 +205,11 @@ impl Device {
             Ok(ptr as *mut u8)
         }
     }
+
+    /// Returns of node
+    pub fn of_node(&self) -> *mut bindings::device_node {
+        unsafe {(*self.ptr).dev.of_node}
+    }
 }
 
 // SAFETY: The device returned by `raw_device` is the raw platform device.
